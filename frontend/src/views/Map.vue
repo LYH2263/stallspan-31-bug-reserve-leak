@@ -16,14 +16,19 @@ const cells = computed(() => {
   const width = data.value.segment.width_m
   const pct = (m: number) => (m / width) * 100
   const out: any[] = []
-  // 两端应急带：米数直接取运行快照中的登记值（与引擎挖空同套）
-  const em = data.value.emergency || { start_m: 0, end_m: 0 }
-  if (em.start_m > 0)
-    out.push({ type: 'emergency', start: 0, w: em.start_m, label: `起点应急 ${em.start_m}m` })
-  if (em.end_m > 0)
-    out.push({ type: 'emergency', start: width - em.end_m, w: em.end_m, label: `终点应急 ${em.end_m}m` })
-  for (const p of data.value.pillars || []) {
-    out.push({ type: 'pillar', start: p.position_m - p.thickness_m / 2, w: p.thickness_m, label: p.label || '挡柱' })
+  // 留白与挡柱一律取自本次运行快照的 blocked_spans——即引擎先挖应急带、
+  // 再并挡柱后输出的同一套禁入区，主图不再自行按登记值或挡柱另算
+  for (const b of data.value.blocked_spans || []) {
+    let label: string
+    if (b.kind === 'emergency') {
+      label = b.start_m <= 1e-9 ? `起点应急 ${b.end_m}m` : `终点应急 ${width - b.start_m}m`
+    } else {
+      const mid = (b.start_m + b.end_m) / 2
+      const p = (data.value.pillars || []).find((q: any) =>
+        mid >= q.position_m - q.thickness_m / 2 - 1e-9 && mid <= q.position_m + q.thickness_m / 2 + 1e-9)
+      label = p?.label || '挡柱'
+    }
+    out.push({ type: b.kind, start: b.start_m, w: b.end_m - b.start_m, label })
   }
   for (const [i, p] of (data.value.placements || []).entries()) {
     out.push({ type: 'stall', start: p.start_m, w: p.width_m, label: p.vendor_name, color: colors[i % colors.length] })

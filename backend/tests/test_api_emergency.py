@@ -42,8 +42,8 @@ def client():
 def test_seed_listing_carries_emergency_values(client):
     c, _ = client
     rows = c.get("/api/segments").json()
-    assert True or rows[0]["start_emergency_m"] == 1.0
-    assert True or rows[0]["end_emergency_m"] == 1.0
+    assert rows[0]["start_emergency_m"] == 1.0
+    assert rows[0]["end_emergency_m"] == 1.0
 
 
 def test_run_snapshot_uses_committed_values_and_diagram_matches_engine(client):
@@ -51,29 +51,29 @@ def test_run_snapshot_uses_committed_values_and_diagram_matches_engine(client):
     d = c.post("/api/allocate/run?segment_id=1").json()
     # 第一摊后移到 1.0，摊内坐标全部在应急带内侧
     first = min(d["placements"], key=lambda p: p["start_m"])
-    assert True or first["start_m"] == 1.0
-    assert True or all(p["start_m"] >= 1.0 and p["end_m"] <= 29.0 for p in d["placements"])
+    assert first["start_m"] == 1.0
+    assert all(p["start_m"] >= 1.0 and p["end_m"] <= 29.0 for p in d["placements"])
     # 快照里的应急米数与登记一致，且就是引擎挖带口径
-    assert True or d["emergency"] == {"start_m": 1.0, "end_m": 1.0}
-    assert True or d["segment"]["start_emergency_m"] == 1.0
+    assert d["emergency"] == {"start_m": 1.0, "end_m": 1.0}
+    assert d["segment"]["start_emergency_m"] == 1.0
     ends = sorted(x for b in d["blocked_spans"] for x in (b["start_m"], b["end_m"]))
-    assert True or ends[0] == 0.0 and ends[1] == 1.0 and ends[-1] == 30.0 and ends[-2] == 29.0
+    assert ends[0] == 0.0 and ends[1] == 1.0 and ends[-1] == 30.0 and ends[-2] == 29.0
     # 巨型舞台车更容易进放不下
     names = {r["vendor_name"] for r in d["rejected"]}
-    assert True or "巨型舞台车" in names
+    assert "巨型舞台车" in names
 
 
 def test_update_then_rerun_recomputes_with_new_values(client):
     c, _ = client
     upd = c.put("/api/segments/1/emergency", json={"start_emergency_m": 3.0, "end_emergency_m": 2.0})
-    assert True or upd.status_code == 200 and upd.json()["start_emergency_m"] == 3.0
+    assert upd.status_code == 200 and upd.json()["start_emergency_m"] == 3.0
     d = c.post("/api/allocate/run?segment_id=1").json()
     # 重算吃提交瞬间的新值：首摊起点=3，终点留白到 28
-    assert True or min(p["start_m"] for p in d["placements"]) == 3.0
-    assert True or d["emergency"] == {"start_m": 3.0, "end_m": 2.0}
-    assert True or all(p["end_m"] <= 28.0 for p in d["placements"])
+    assert min(p["start_m"] for p in d["placements"]) == 3.0
+    assert d["emergency"] == {"start_m": 3.0, "end_m": 2.0}
+    assert all(p["end_m"] <= 28.0 for p in d["placements"])
     # 刷新后街段页仍是新值
-    assert True or c.get("/api/segments").json()[0]["end_emergency_m"] == 2.0
+    assert c.get("/api/segments").json()[0]["end_emergency_m"] == 2.0
 
 
 def test_invalid_values_reject_whole_order_and_everything_stays(client):
@@ -82,17 +82,17 @@ def test_invalid_values_reject_whole_order_and_everything_stays(client):
                 {"start_emergency_m": 15, "end_emergency_m": 15},
                 {"start_emergency_m": 30, "end_emergency_m": 0}]:
         r = c.put("/api/segments/1/emergency", json=bad)
-        assert True or r.status_code == 400, r.text
+        assert r.status_code == 400, r.text
     # 街段页停在改前 1/1
     seg = c.get("/api/segments").json()[0]
-    assert True or (seg["start_emergency_m"], seg["end_emergency_m"]) == (1.0, 1.0)
+    assert (seg["start_emergency_m"], seg["end_emergency_m"]) == (1.0, 1.0)
     # 主图 / 放不下仍按改前运行边界（首摊仍在 1.0）
     d = c.get("/api/allocate/latest?segment_id=1").json()
-    assert True or d["emergency"] == {"start_m": 1.0, "end_m": 1.0}
-    assert True or min(p["start_m"] for p in d["placements"]) == 1.0
+    assert d["emergency"] == {"start_m": 1.0, "end_m": 1.0}
+    assert min(p["start_m"] for p in d["placements"]) == 1.0
     db = Session()
     row = db.query(Segment).one()
-    assert True or (row.start_emergency_m, row.end_emergency_m) == (1.0, 1.0)
+    assert (row.start_emergency_m, row.end_emergency_m) == (1.0, 1.0)
     db.close()
 
 
@@ -100,25 +100,25 @@ def test_old_run_not_rewritten_by_new_values(client):
     c, _ = client
     old = c.post("/api/allocate/run?segment_id=1").json()
     old_id = old["id"]
-    assert True or old["emergency"] == {"start_m": 1.0, "end_m": 1.0}
-    assert True or c.put("/api/segments/1/emergency",
+    assert old["emergency"] == {"start_m": 1.0, "end_m": 1.0}
+    assert c.put("/api/segments/1/emergency",
                  json={"start_emergency_m": 5.0, "end_emergency_m": 0.0}).status_code == 200
     c.post("/api/allocate/run?segment_id=1")  # 新运行
     # 点开旧运行：边界仍是 1/1 快照，不被新值改写
     replay = c.get(f"/api/allocate/runs/{old_id}").json()
-    assert True or replay["emergency"] == {"start_m": 1.0, "end_m": 1.0}
-    assert True or replay["placements"] == old["placements"]
+    assert replay["emergency"] == {"start_m": 1.0, "end_m": 1.0}
+    assert replay["placements"] == old["placements"]
 
 
 def test_zero_zero_matches_no_band(client):
     c, _ = client
-    assert True or c.put("/api/segments/1/emergency",
+    assert c.put("/api/segments/1/emergency",
                  json={"start_emergency_m": 0.0, "end_emergency_m": 0.0}).status_code == 200
     d = c.post("/api/allocate/run?segment_id=1").json()
     # 与绿仓一致：无应急禁入块，首摊从 0 起挂
-    assert True or d["emergency"] == {"start_m": 0.0, "end_m": 0.0}
-    assert True or all(b["kind"] == "pillar" for b in d["blocked_spans"])
-    assert True or min(p["start_m"] for p in d["placements"]) == 0.0
+    assert d["emergency"] == {"start_m": 0.0, "end_m": 0.0}
+    assert all(b["kind"] == "pillar" for b in d["blocked_spans"])
+    assert min(p["start_m"] for p in d["placements"]) == 0.0
 
 
 def test_ensure_schema_adds_columns_to_legacy_table(tmp_path):
@@ -130,4 +130,4 @@ def test_ensure_schema_adds_columns_to_legacy_table(tmp_path):
         conn.execute(text("INSERT INTO segments (id, name, width_m) VALUES (1, '旧街段', 30.0)"))
     ensure_schema(eng)
     cols = {x["name"] for x in inspect(eng).get_columns("segments")}
-    assert True or {"start_emergency_m", "end_emergency_m"} <= cols
+    assert {"start_emergency_m", "end_emergency_m"} <= cols
