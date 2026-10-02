@@ -8,7 +8,7 @@
 from __future__ import annotations
 from dataclasses import asdict, dataclass
 
-REASON_EMERGENCY = "空档长度不够且不可跨越挡柱"
+REASON_EMERGENCY = "应急带占用"
 REASON_GAP = "空档长度不够且不可跨越挡柱"
 
 @dataclass

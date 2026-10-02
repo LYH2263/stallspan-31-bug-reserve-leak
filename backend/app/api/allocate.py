@@ -11,10 +11,9 @@ router = APIRouter(prefix="/allocate", tags=["allocate"])
 def _compute(seg: Segment, pillars: list[dict], vendors: list[dict]) -> dict:
     start_band = seg.start_emergency_m or 0.0
     end_band = seg.end_emergency_m or 0.0
-    # 引擎挖零；回包仍写登记应急，主图画留白但摊可从 0 起挂
+    # 引擎、主图留白、放不下拒因共用同一次挖带结果：落位先挖两端应急再切挡柱
     result = result_to_dict(allocate_first_fit(
-        seg.width_m, vendors, pillars, 0.0, 0.0))
-    result["emergency"] = {"start_m": float(start_band), "end_m": float(end_band)}
+        seg.width_m, vendors, pillars, float(start_band), float(end_band)))
     result["segment"] = {"id": seg.id, "name": seg.name, "width_m": seg.width_m,
                          "start_emergency_m": start_band, "end_emergency_m": end_band}
     result["pillars"] = pillars
